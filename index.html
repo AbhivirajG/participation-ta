@@ -1,0 +1,623 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Participation TA</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --ink: #1c2430; --muted: #6b7686; --line: #e1e5ea;
+    --accent: #275170; --accent-ink: #ffffff; --warn: #b4530a; --warn-bg: #fff4e5;
+    --ok: #1f7a4d; --ok-bg: #e8f5ee; --bad: #b3261e; --bad-bg: #fdecea;
+    --pending: #fff8dc; --pending-line: #e6c95c; --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  kbd { font: 11px var(--mono); background: #eef1f4; border: 1px solid #d5dae0; border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; }
+
+  /* ---- top bar ---- */
+  #top { display: flex; align-items: center; gap: 14px; padding: 8px 16px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; position: sticky; top: 0; z-index: 5; }
+  #top h1 { font-size: 15px; margin: 0 8px 0 0; letter-spacing: .2px; }
+  #top label { color: var(--muted); font-size: 12px; display: flex; align-items: center; gap: 6px; }
+  #top input[type=date], #top input[type=text] { border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; background: #fff; }
+  #tab { width: 64px; font-family: var(--mono); }
+  .spacer { flex: 1; }
+  .btn { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 6px 12px; }
+  .btn:hover { background: #f1f3f6; }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .btn.primary:hover { background: #1e405a; }
+  .btn.rec { display: flex; align-items: center; gap: 8px; min-width: 130px; justify-content: center; }
+  .btn.rec.on { background: var(--bad); border-color: var(--bad); color: #fff; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: #999; }
+  .on .dot { background: #fff; animation: pulse 1.2s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .3 } }
+  #level { width: 70px; height: 8px; background: #e6e9ee; border-radius: 4px; overflow: hidden; }
+  #level i { display: block; height: 100%; width: 0; background: var(--ok); transition: width .08s; }
+  #status { font-size: 12px; color: var(--muted); min-width: 120px; }
+  #syncstate { font-size: 12px; padding: 3px 8px; border-radius: 6px; background: #eef1f4; color: var(--muted); }
+  #syncstate.ok { background: var(--ok-bg); color: var(--ok); }
+  #syncstate.bad { background: var(--bad-bg); color: var(--bad); }
+  #syncstate.dirty { background: var(--warn-bg); color: var(--warn); }
+
+  /* ---- layout ---- */
+  #main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 14px; padding: 14px 16px 40px; }
+  @media (max-width: 980px) { #main { grid-template-columns: 1fr; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+  .panel h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin: 0; padding: 10px 14px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
+  .panel h2 .spacer { flex: 1; }
+
+  /* ---- pending cards ---- */
+  #pending { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+  .card { background: var(--pending); border: 1px solid var(--pending-line); border-left-width: 5px; border-radius: 8px; padding: 10px 14px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .card .t { font-family: var(--mono); color: var(--muted); }
+  .card .who { font-weight: 600; font-size: 15px; }
+  .card .alt { display: flex; gap: 6px; flex-wrap: wrap; }
+  .card .alt button { border: 1px solid var(--pending-line); background: #fff; border-radius: 6px; padding: 3px 9px; }
+  .card .ctx { flex-basis: 100%; color: var(--muted); font-size: 12px; font-style: italic; }
+  .card .keys { margin-left: auto; color: var(--muted); font-size: 12px; display: flex; gap: 8px; }
+  .card .x { border: none; background: none; font-size: 16px; color: var(--muted); }
+
+  /* ---- log table ---- */
+  #log table { width: 100%; border-collapse: collapse; }
+  #log th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); padding: 8px 8px; border-bottom: 1px solid var(--line); font-weight: 600; }
+  #log td { padding: 4px 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  #log tr.row:hover { background: #fafbfc; }
+  #log input { width: 100%; border: 1px solid transparent; background: transparent; border-radius: 5px; padding: 5px 6px; }
+  #log input:hover { border-color: var(--line); }
+  #log input:focus { outline: none; border-color: var(--accent); background: #fff; box-shadow: 0 0 0 2px rgba(39,81,112,.15); }
+  #log input.time { width: 82px; font-family: var(--mono); font-size: 12px; }
+  #log input.type { width: 92px; }
+  #log input.pts { width: 42px; text-align: center; font-weight: 600; }
+  #log input.pts.p1 { color: var(--warn); } #log input.pts.p2 { color: var(--accent); } #log input.pts.p3 { color: var(--ok); }
+  #log .stu { position: relative; min-width: 160px; }
+  #log .stu input.unknown { color: var(--warn); }
+  .ac { position: absolute; left: 0; top: 100%; z-index: 10; background: #fff; border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,.12); min-width: 220px; max-height: 240px; overflow: auto; }
+  .ac div { padding: 6px 10px; cursor: pointer; }
+  .ac div.sel, .ac div:hover { background: #eef3f8; }
+  .ac small { color: var(--muted); margin-left: 6px; }
+  td.act { white-space: nowrap; text-align: right; }
+  td.act button { border: none; background: none; color: var(--muted); padding: 2px 5px; font-size: 14px; }
+  td.act button:hover { color: var(--ink); }
+  tr.snip td { background: #fafbfc; color: var(--muted); font-size: 12px; padding: 6px 14px 10px; }
+  tr.snip .s { font-family: var(--mono); font-size: 12px; white-space: pre-wrap; }
+  #empty { padding: 30px; color: var(--muted); text-align: center; }
+  #logfoot { display: flex; gap: 10px; align-items: center; padding: 10px 14px; border-top: 1px solid var(--line); flex-wrap: wrap; }
+  #logfoot .hint { color: var(--muted); font-size: 12px; display: flex; gap: 12px; flex-wrap: wrap; }
+  #endnote { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; min-height: 60px; resize: vertical; }
+
+  /* ---- side ---- */
+  #side { display: flex; flex-direction: column; gap: 14px; position: sticky; top: 62px; align-self: start; max-height: calc(100vh - 76px); }
+  #transcript { flex: 1 1 45%; min-height: 200px; display: flex; flex-direction: column; }
+  #tlist { overflow: auto; padding: 8px 12px; flex: 1; font-size: 13px; }
+  #tlist .seg { margin-bottom: 6px; }
+  #tlist .seg b { font-family: var(--mono); font-weight: normal; color: var(--muted); font-size: 11px; margin-right: 6px; }
+  #tlist .seg mark { background: #ffe58a; border-radius: 3px; padding: 0 2px; }
+  #tlist .interim { color: var(--muted); font-style: italic; }
+  #roster { flex: 1 1 55%; min-height: 200px; display: flex; flex-direction: column; }
+  #rlist { overflow: auto; flex: 1; }
+  #rlist table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  #rlist td { padding: 3px 12px; border-bottom: 1px solid #f0f2f5; }
+  #rlist td.n { text-align: right; font-family: var(--mono); color: var(--muted); width: 36px; }
+  #rlist td.n.has { color: var(--ink); font-weight: 600; }
+  #rlist td.att { width: 44px; text-align: center; }
+  #rlist td.att button { border: 1px solid var(--line); background: #fff; border-radius: 5px; width: 36px; padding: 1px 0; font-size: 12px; color: var(--muted); }
+  #rlist td.att button.p1 { background: var(--ok-bg); color: var(--ok); border-color: #bfe3cf; }
+  #rlist td.att button.p05 { background: var(--warn-bg); color: var(--warn); border-color: #f2d3ac; }
+  #rlist td.att button.p0 { background: var(--bad-bg); color: var(--bad); border-color: #f3c3bf; }
+
+  /* ---- modal ---- */
+  #modal { position: fixed; inset: 0; background: rgba(20,28,38,.45); display: none; align-items: center; justify-content: center; z-index: 50; padding: 20px; }
+  #modal.open { display: flex; }
+  #modal .box { background: #fff; border-radius: 12px; width: min(720px, 100%); max-height: 90vh; overflow: auto; padding: 18px 22px; }
+  #modal h3 { margin: 0 0 12px; }
+  #modal label { display: block; margin: 12px 0 4px; font-weight: 600; font-size: 13px; }
+  #modal input[type=text], #modal textarea { width: 100%; border: 1px solid var(--line); border-radius: 6px; padding: 7px 9px; }
+  #modal textarea { min-height: 220px; font-family: var(--mono); font-size: 12px; }
+  #modal .row { display: flex; gap: 8px; align-items: center; }
+  #modal .row input[type=text] { flex: 1; }
+  #modal p.help { color: var(--muted); font-size: 12px; margin: 4px 0 0; }
+  #modal .foot { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+  #ping { font-size: 12px; }
+  #banner { display: none; background: var(--warn-bg); color: var(--warn); padding: 8px 16px; font-size: 13px; }
+  #banner.show { display: block; }
+  #toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: #1c2430; color: #fff; padding: 9px 16px; border-radius: 8px; font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 60; }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div id="top">
+  <h1>Participation TA</h1>
+  <label>Class <input type="date" id="date"></label>
+  <label>Tab <input type="text" id="tab" title="Sheet tab name for this class"></label>
+  <button class="btn rec" id="recbtn"><span class="dot"></span><span id="reclabel">Start listening</span></button>
+  <div id="level" title="Mic level"><i></i></div>
+  <span id="status">Not listening</span>
+  <div class="spacer"></div>
+  <span id="syncstate">Not synced</span>
+  <button class="btn primary" id="syncbtn" title="Push rows, roll-up, note and attendance to the Google Sheet">Sync to Sheet</button>
+  <button class="btn" id="csvbtn" title="Download the log as CSV">CSV</button>
+  <button class="btn" id="setbtn">Settings</button>
+</div>
+<div id="banner"></div>
+
+<div id="main">
+  <div>
+    <div id="pending"></div>
+
+    <div class="panel" id="log">
+      <h2>Live contribution log <span class="spacer"></span><button class="btn" id="newbtn">+ New row <kbd>N</kbd></button></h2>
+      <table>
+        <thead><tr>
+          <th style="width:90px">Time</th><th>Student</th><th style="width:100px">Type</th><th>What they said</th><th style="width:50px">Pts</th><th style="width:60px"></th>
+        </tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div id="empty">No contributions yet. Start listening — when the professor says a name a card appears above. Or press <kbd>N</kbd> for a blank row.</div>
+      <div id="logfoot">
+        <div class="hint">
+          <span><kbd>Enter</kbd> accept card</span>
+          <span><kbd>Esc</kbd> dismiss card</span>
+          <span><kbd>Q</kbd>/<kbd>R</kbd>/<kbd>C</kbd> type</span>
+          <span><kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd> points</span>
+          <span><kbd>⌘</kbd>+<kbd>Enter</kbd> new row from anywhere</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:14px">
+      <h2>End-of-class note</h2>
+      <div style="padding:10px 14px"><textarea id="endnote" placeholder="Overall note for today (goes to L6 on the sheet)…"></textarea></div>
+    </div>
+  </div>
+
+  <div id="side">
+    <div class="panel" id="transcript">
+      <h2>Live transcript <span class="spacer"></span><span id="tcount" style="font-weight:normal;text-transform:none;letter-spacing:0"></span></h2>
+      <div id="tlist"></div>
+    </div>
+    <div class="panel" id="roster">
+      <h2>Roster &amp; roll-up <span class="spacer"></span><span style="font-weight:normal;text-transform:none;letter-spacing:0">entries · pts · attend</span></h2>
+      <div id="rlist"></div>
+    </div>
+  </div>
+</div>
+
+<div id="modal">
+  <div class="box">
+    <h3>Settings</h3>
+    <label>Google Sheet sync URL (Apps Script web app)</label>
+    <div class="row"><input type="text" id="s_url" placeholder="https://script.google.com/macros/s/…/exec"><button class="btn" id="pingbtn">Test</button><span id="ping"></span></div>
+    <p class="help">Deploy <code>apps-script/Code.gs</code> on the sheet once (see README), paste the /exec URL here.</p>
+    <label><input type="checkbox" id="s_auto"> Auto-sync every 60 s while listening</label>
+    <label>Name-hit cooldown (seconds) — same student won't re-trigger a card within this window</label>
+    <input type="text" id="s_cool" style="width:80px">
+    <label>Roster — one per line: <code>First Last</code>, optional nicknames after a <code>|</code> (e.g. <code>Matthew Smith | Matt, Matty</code>)</label>
+    <div class="row" style="margin-bottom:6px"><button class="btn" id="s_import">Import roster from sheet</button><span id="s_importmsg" style="font-size:12px;color:var(--muted)"></span></div>
+    <textarea id="s_roster"></textarea>
+    <label>Common-word names — first names that are also ordinary words (only trigger at the start/end of a sentence)</label>
+    <input type="text" id="s_common">
+    <div class="foot">
+      <button class="btn" id="s_wipe" style="margin-right:auto;color:var(--bad)">Clear today's session</button>
+      <button class="btn" id="s_cancel">Cancel</button>
+      <button class="btn primary" id="s_save">Save</button>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+/* =========================================================================
+   Participation TA — single-file web app.
+   Listens with Chrome's Web Speech API, spots roster names in the live
+   transcript, and turns them into contribution rows the TA completes with
+   the keyboard. Rows sync to the class Google Sheet via an Apps Script.
+   ========================================================================= */
+
+// ---------- defaults ----------
+const DEFAULT_ROSTER = '';   // roster lives in the sheet — Settings → Import from sheet
+const DEFAULT_COMMON = 'max, august, harry';
+const TYPES = { q: 'Question', r: 'Response', c: 'Comment' };
+const SNIP_BEFORE = 10_000, SNIP_AFTER = 60_000;
+
+// ---------- state ----------
+let settings = loadJSON('lta:settings') || {};
+settings = Object.assign({ scriptUrl: '', autoSync: false, cooldownSec: 45, rosterText: DEFAULT_ROSTER, commonWords: DEFAULT_COMMON }, settings);
+let roster = parseRoster(settings.rosterText);
+let S = null;              // today's session
+let listening = false, rec = null, restartTimer = null, interim = '';
+let pending = [];          // name-hit cards awaiting the TA
+let lastHit = {};          // student -> ms of last card
+let dirty = false, syncing = false, autoTimer = null;
+
+const $ = s => document.querySelector(s);
+const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
+const uid = () => Math.random().toString(36).slice(2, 10);
+const fmtTime = ms => new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+const tabFor = iso => { const [, m, d] = iso.split('-'); return `${+m}${+d}`; };   // 2026-09-16 -> "916"
+
+function loadJSON(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }
+function saveJSON(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { console.warn('storage', e); } }
+function saveSettings() { saveJSON('lta:settings', settings); }
+function saveSession() { if (S) saveJSON('lta:session:' + S.date, S); }
+function loadSession(date) {
+  S = loadJSON('lta:session:' + date) || { date, tab: tabFor(date), rows: [], transcript: [], endNote: '', attendance: {}, lastSync: null };
+  $('#date').value = S.date; $('#tab').value = S.tab; $('#endnote').value = S.endNote;
+  pending = []; lastHit = {};
+  renderAll(); setSyncState(S.lastSync ? 'ok' : '');
+}
+function markDirty() { dirty = true; saveSession(); setSyncState('dirty'); }
+
+// ---------- roster ----------
+function parseRoster(text) {
+  return text.split('\n').map(l => l.trim()).filter(Boolean).map(l => {
+    const [name, nicks] = l.split('|').map(s => s.trim());
+    const parts = name.split(/\s+/);
+    return { full: name, first: parts[0], last: parts.slice(1).join(' '), nicks: nicks ? nicks.split(',').map(s => s.trim()).filter(Boolean) : [] };
+  });
+}
+const norm = s => s.toLowerCase().replace(/[’']/g, '').replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+function soundex(s) {
+  s = s.toUpperCase().replace(/[^A-Z]/g, ''); if (!s) return '';
+  const codes = { B: 1, F: 1, P: 1, V: 1, C: 2, G: 2, J: 2, K: 2, Q: 2, S: 2, X: 2, Z: 2, D: 3, T: 3, L: 4, M: 5, N: 5, R: 6 };
+  let out = s[0], prev = codes[s[0]] || 0;
+  for (const ch of s.slice(1)) { const c = codes[ch] || 0; if (c && c !== prev) out += c; if (ch !== 'H' && ch !== 'W') prev = c; }
+  return (out + '000').slice(0, 4);
+}
+function lev(a, b) {
+  const m = a.length, n = b.length; if (!m) return n; if (!n) return m;
+  let prev = Array.from({ length: n + 1 }, (_, i) => i);
+  for (let i = 1; i <= m; i++) { const cur = [i]; for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); prev = cur; }
+  return prev[n];
+}
+
+// Name spotting: returns [{student, score, token}] for a transcript segment.
+function spotNames(text) {
+  const t = norm(text), tokens = t.split(' ');
+  const common = new Set(settings.commonWords.split(',').map(s => norm(s)).filter(Boolean));
+  const hits = [];
+  for (const st of roster) {
+    const first = norm(st.first), last = norm(st.last), full = norm(st.full);
+    const aliases = [first, ...st.nicks.map(norm)];
+    let best = 0, tok = '';
+    if (full && t.includes(full)) { best = 5; tok = full; }
+    tokens.forEach((w, i) => {
+      if (!w) return;
+      const edge = i <= 1 || i >= tokens.length - 2;
+      for (const a of aliases) {
+        if (w === a) {
+          if (common.has(a) && !edge) return;            // "max" mid-sentence is probably the word
+          if (3 > best) { best = 3; tok = w; }
+        } else if (a.length >= 4 && w.length >= 4 && !common.has(a) && soundex(w) === soundex(a) && lev(w, a) <= 2) {
+          if (1 > best) { best = 1; tok = w; }
+        }
+      }
+      if (last.length >= 4 && w === last && !common.has(last) && 2 > best) { best = 2; tok = w; }
+    });
+    if (best) hits.push({ student: st.full, score: best, token: tok });
+  }
+  return hits.sort((a, b) => b.score - a.score);
+}
+
+// ---------- speech ----------
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+function setStatus(s) { $('#status').textContent = s; }
+function startListening() {
+  if (!SR) { toast('This browser has no Web Speech API — use Chrome.'); return; }
+  listening = true; $('#recbtn').classList.add('on'); $('#reclabel').textContent = 'Listening';
+  startRec(); startMeter();
+  if (settings.autoSync && settings.scriptUrl) autoTimer = setInterval(() => { if (dirty && !syncing) syncSheet(true); }, 60_000);
+}
+function stopListening() {
+  listening = false; clearTimeout(restartTimer); clearInterval(autoTimer);
+  try { rec && rec.stop(); } catch {}
+  $('#recbtn').classList.remove('on'); $('#reclabel').textContent = 'Start listening'; setStatus('Not listening'); stopMeter();
+}
+function startRec() {
+  if (!listening) return;
+  rec = new SR(); rec.continuous = true; rec.interimResults = true; rec.lang = 'en-US'; rec.maxAlternatives = 3;
+  rec.onstart = () => setStatus('Listening…');
+  rec.onresult = e => {
+    interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const r = e.results[i];
+      if (r.isFinal) {
+        const alts = Array.from(r).map(a => a.transcript.trim()).filter(Boolean);
+        addSegment(alts[0], alts.slice(1));
+      } else interim += r[0].transcript;
+    }
+    renderInterim();
+  };
+  rec.onerror = e => {
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { stopListening(); setStatus('Mic blocked'); $('#banner').textContent = 'Microphone access was blocked. Click the lock/mic icon in the address bar, allow the microphone, then reload.'; $('#banner').classList.add('show'); return; }
+    if (e.error !== 'no-speech' && e.error !== 'aborted') setStatus('Error: ' + e.error + ' — restarting');
+  };
+  // Chrome ends continuous sessions after ~60 s of silence or on its own; always restart.
+  rec.onend = () => { if (listening) { setStatus('Restarting…'); restartTimer = setTimeout(startRec, 200); } };
+  try { rec.start(); } catch (e) { restartTimer = setTimeout(startRec, 500); }
+}
+function addSegment(text, alts) {
+  if (!text) return;
+  const t = Date.now();
+  const seg = { t, text };
+  S.transcript.push(seg); saveSession(); renderSegment(seg);
+  // Name hits: check the best alternative first, then the others (Chrome often has the name right in alt #2).
+  let hits = spotNames(text);
+  for (const a of alts) { if (hits.length) break; hits = spotNames(a).map(h => ({ ...h, viaAlt: true })); }
+  hits = hits.filter(h => !(lastHit[h.student] && t - lastHit[h.student] < settings.cooldownSec * 1000));
+  if (!hits.length) return;
+  // Group: strong (exact) hits become candidates on one card; phonetic-only hits ride along as extra options.
+  const top = hits[0].score, cands = hits.filter(h => h.score === top || h.score >= 2).slice(0, 4);
+  if (top < 2 && cands.length > 2) return;   // too fuzzy to be useful
+  cands.forEach(h => lastHit[h.student] = t);
+  pending.push({ id: uid(), t, candidates: cands.map(c => c.student), context: text, weak: top < 2 });
+  renderPending();
+}
+
+// Mic level meter — independent of the recognizer, so the TA can see the mic is picking up the room.
+let meterCtx = null, meterRAF = 0, meterStream = null;
+async function startMeter() {
+  try {
+    meterStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    meterCtx = new AudioContext(); const src = meterCtx.createMediaStreamSource(meterStream);
+    const an = meterCtx.createAnalyser(); an.fftSize = 512; src.connect(an);
+    const buf = new Uint8Array(an.fftSize);
+    const tick = () => { an.getByteTimeDomainData(buf); let sum = 0; for (const v of buf) { const d = (v - 128) / 128; sum += d * d; } const rms = Math.sqrt(sum / buf.length); $('#level i').style.width = Math.min(100, rms * 400) + '%'; meterRAF = requestAnimationFrame(tick); };
+    tick();
+  } catch (e) { console.warn('meter', e); }
+}
+function stopMeter() { cancelAnimationFrame(meterRAF); meterStream && meterStream.getTracks().forEach(t => t.stop()); meterCtx && meterCtx.close(); meterCtx = null; $('#level i').style.width = '0'; }
+
+// ---------- transcript panel ----------
+function renderTranscript() { $('#tlist').innerHTML = ''; S.transcript.forEach(renderSegment); renderInterim(); }
+function renderSegment(seg) {
+  const list = $('#tlist'); const d = el('div', 'seg');
+  d.appendChild(el('b', null, fmtTime(seg.t)));
+  const names = roster.flatMap(s => [s.first, ...s.nicks]).filter(n => n.length >= 3);
+  if (!names.length) { d.appendChild(el('span', null, seg.text)); list.appendChild(d); list.scrollTop = list.scrollHeight; $('#tcount').textContent = S.transcript.length + ' segments'; return; }
+  const re = new RegExp('\\b(' + names.map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')\\b', 'gi');
+  let last = 0, m; const span = el('span');
+  while ((m = re.exec(seg.text))) { span.appendChild(document.createTextNode(seg.text.slice(last, m.index))); span.appendChild(el('mark', null, m[0])); last = m.index + m[0].length; }
+  span.appendChild(document.createTextNode(seg.text.slice(last)));
+  d.appendChild(span); list.appendChild(d);
+  const im = $('#tlist .interim'); if (im) list.appendChild(im);
+  list.scrollTop = list.scrollHeight; $('#tcount').textContent = S.transcript.length + ' segments';
+}
+function renderInterim() {
+  let im = $('#tlist .interim'); if (!im) { im = el('div', 'seg interim'); $('#tlist').appendChild(im); }
+  im.textContent = interim ? '… ' + interim : ''; $('#tlist').scrollTop = $('#tlist').scrollHeight;
+}
+function snippetFor(t) {
+  return S.transcript.filter(s => s.t >= t - SNIP_BEFORE && s.t <= t + SNIP_AFTER).map(s => s.text).join(' ').slice(0, 600);
+}
+
+// ---------- pending cards ----------
+function renderPending() {
+  const box = $('#pending'); box.innerHTML = '';
+  pending.forEach((p, idx) => {
+    const c = el('div', 'card');
+    c.appendChild(el('span', 't', fmtTime(p.t)));
+    if (p.candidates.length === 1) c.appendChild(el('span', 'who', p.candidates[0] + (p.weak ? ' ?' : '')));
+    else { const a = el('div', 'alt'); p.candidates.forEach((n, i) => { const b = el('button', null, `${i + 1}  ${n}`); b.onclick = () => acceptPending(p, i); a.appendChild(b); }); c.appendChild(a); }
+    const keys = el('div', 'keys');
+    if (idx === 0) keys.innerHTML = p.candidates.length === 1 ? '<kbd>Enter</kbd> accept · <kbd>Esc</kbd> dismiss' : '<kbd>1</kbd>–<kbd>' + p.candidates.length + '</kbd> pick · <kbd>Esc</kbd> dismiss';
+    c.appendChild(keys);
+    const x = el('button', 'x', '×'); x.title = 'Dismiss'; x.onclick = () => dismissPending(p); c.appendChild(x);
+    if (p.candidates.length === 1) { const acc = el('button', 'btn', 'Accept'); acc.onclick = () => acceptPending(p, 0); c.insertBefore(acc, keys); }
+    c.appendChild(el('div', 'ctx', '“' + p.context + '”'));
+    box.appendChild(c);
+  });
+}
+function dismissPending(p) { pending = pending.filter(x => x !== p); renderPending(); }
+function acceptPending(p, i) {
+  const student = p.candidates[i]; if (!student) return;
+  dismissPending(p);
+  const row = addRow({ t: p.t, student });
+  focusField(row.id, 'type');
+}
+
+// ---------- rows ----------
+function addRow(partial) {
+  const row = Object.assign({ id: uid(), t: Date.now(), timeText: '', student: '', type: '', note: '', points: '' }, partial);
+  S.rows.push(row); markDirty(); renderRows(); renderRoster();
+  return row;
+}
+function newRow() { const r = addRow({}); focusField(r.id, 'student'); }
+function deleteRow(id) { S.rows = S.rows.filter(r => r.id !== id); markDirty(); renderRows(); renderRoster(); }
+function focusField(id, f) { const i = document.querySelector(`tr[data-id="${id}"] input.${f}`); if (i) { i.focus(); i.select && i.select(); } }
+function rowSorted() { return S.rows.slice().sort((a, b) => a.t - b.t); }
+
+function renderRows() {
+  const tb = $('#rows'); tb.innerHTML = '';
+  $('#empty').style.display = S.rows.length ? 'none' : '';
+  for (const r of rowSorted()) tb.appendChild(rowEl(r));
+}
+function rowEl(r) {
+  const tr = el('tr', 'row'); tr.dataset.id = r.id;
+  // time
+  const tdT = el('td'); const it = el('input', 'time'); it.value = r.timeText || fmtTime(r.t); it.title = 'Edit to override (e.g. "9:30 ish")';
+  it.onchange = () => { r.timeText = it.value.trim() === fmtTime(r.t) ? '' : it.value.trim(); markDirty(); }; tdT.appendChild(it); tr.appendChild(tdT);
+  // student with autocomplete
+  const tdS = el('td', 'stu'); const is = el('input', 'student'); is.value = r.student; is.placeholder = 'Name or "Unnamed – …"'; is.autocomplete = 'off';
+  if (r.student && !roster.some(s => s.full === r.student)) is.classList.add('unknown');
+  attachAutocomplete(is, r, tdS); tdS.appendChild(is); tr.appendChild(tdS);
+  // type
+  const tdY = el('td'); const iy = el('input', 'type'); iy.value = r.type; iy.placeholder = 'Q / R / C';
+  iy.onkeydown = e => {
+    const k = e.key.toLowerCase();
+    if (TYPES[k]) { e.preventDefault(); r.type = TYPES[k]; iy.value = r.type; markDirty(); focusField(r.id, 'note'); }
+    else if (e.key === 'Enter' || e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); focusField(r.id, 'note'); }
+    else if (e.key === 'Backspace') { r.type = ''; iy.value = ''; markDirty(); }
+    else if (e.key.length === 1) e.preventDefault();
+  };
+  tdY.appendChild(iy); tr.appendChild(tdY);
+  // note
+  const tdN = el('td'); const inn = el('input', 'note'); inn.value = r.note; inn.placeholder = 'One neutral line…';
+  inn.oninput = () => { r.note = inn.value; markDirty(); };
+  inn.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); focusField(r.id, 'pts'); } };
+  tdN.appendChild(inn); tr.appendChild(tdN);
+  // points
+  const tdP = el('td'); const ip = el('input', 'pts p' + r.points); ip.value = r.points; ip.placeholder = '–';
+  ip.onkeydown = e => {
+    if ('123'.includes(e.key) && e.key) { e.preventDefault(); r.points = +e.key; ip.value = r.points; ip.className = 'pts p' + r.points; markDirty(); ip.blur(); }
+    else if (e.key === 'Backspace' || e.key === 'Delete') { r.points = ''; ip.value = ''; ip.className = 'pts'; markDirty(); }
+    else if (e.key === 'Enter' || e.key === 'Escape') ip.blur();
+    else if (e.key.length === 1) e.preventDefault();
+  };
+  ip.onblur = renderRoster;
+  tdP.appendChild(ip); tr.appendChild(tdP);
+  // actions
+  const tdA = el('td', 'act');
+  const bs = el('button', null, '▸'); bs.title = 'Show transcript around this time';
+  bs.onclick = () => { const nx = tr.nextSibling; if (nx && nx.classList.contains('snip')) { nx.remove(); bs.textContent = '▸'; return; } const s = el('tr', 'snip'); const td = el('td'); td.colSpan = 6; td.appendChild(el('div', 's', snippetFor(r.t) || '(nothing transcribed in this window)')); s.appendChild(td); tr.after(s); bs.textContent = '▾'; };
+  const bd = el('button', null, '×'); bd.title = 'Delete row'; bd.onclick = () => deleteRow(r.id);
+  tdA.appendChild(bs); tdA.appendChild(bd); tr.appendChild(tdA);
+  return tr;
+}
+function attachAutocomplete(input, r, host) {
+  let box = null, sel = 0, matches = [];
+  const close = () => { box && box.remove(); box = null; };
+  const commit = name => { r.student = name; input.value = name; input.classList.toggle('unknown', !!name && !roster.some(s => s.full === name)); markDirty(); renderRoster(); close(); };
+  const update = () => {
+    const q = norm(input.value); matches = [];
+    if (q) {
+      for (const s of roster) {
+        const f = norm(s.first), l = norm(s.last), full = norm(s.full); let sc = 0;
+        if (full.startsWith(q)) sc = 4; else if (f.startsWith(q) || l.startsWith(q)) sc = 3; else if (full.includes(q)) sc = 2;
+        else if (q.length >= 3 && [f, l].some(x => lev(x, q) <= 2)) sc = 1;
+        else if (s.nicks.some(n => norm(n).startsWith(q))) sc = 3;
+        if (sc) matches.push({ s, sc });
+      }
+      matches.sort((a, b) => b.sc - a.sc || a.s.full.localeCompare(b.s.full)); matches = matches.slice(0, 8);
+    }
+    close(); if (!matches.length) return;
+    box = el('div', 'ac'); sel = Math.min(sel, matches.length - 1);
+    matches.forEach((m, i) => { const d = el('div', i === sel ? 'sel' : ''); d.textContent = m.s.full; d.onmousedown = e => { e.preventDefault(); commit(m.s.full); }; box.appendChild(d); });
+    host.appendChild(box);
+  };
+  input.oninput = () => { r.student = input.value; markDirty(); sel = 0; update(); };
+  input.onfocus = update;
+  input.onblur = () => setTimeout(close, 100);
+  input.onkeydown = e => {
+    if (e.key === 'ArrowDown' && box) { e.preventDefault(); sel = (sel + 1) % matches.length; update(); }
+    else if (e.key === 'ArrowUp' && box) { e.preventDefault(); sel = (sel - 1 + matches.length) % matches.length; update(); }
+    else if (e.key === 'Enter' || e.key === 'Tab') { if (matches.length && (e.key === 'Enter' || norm(input.value) !== norm(matches[sel].s.full))) { e.preventDefault(); commit(matches[sel].s.full); focusField(r.id, 'type'); } else if (e.key === 'Enter') { e.preventDefault(); commit(input.value.trim()); focusField(r.id, 'type'); } }
+    else if (e.key === 'Escape') { close(); input.blur(); }
+  };
+}
+
+// ---------- roster / roll-up ----------
+function renderRoster() {
+  const box = $('#rlist'); const tbl = el('table');
+  const stats = {}; for (const r of S.rows) { if (!r.student) continue; stats[r.student] = stats[r.student] || { n: 0, p: 0 }; stats[r.student].n++; stats[r.student].p += +r.points || 0; }
+  for (const s of roster) {
+    const st = stats[s.full] || { n: 0, p: 0 }; const tr = el('tr');
+    tr.appendChild(el('td', null, s.full));
+    tr.appendChild(el('td', 'n' + (st.n ? ' has' : ''), st.n || '·'));
+    tr.appendChild(el('td', 'n' + (st.p ? ' has' : ''), st.p || '·'));
+    const ta = el('td', 'att'); const v = S.attendance[s.full]; const b = el('button', v === 1 ? 'p1' : v === 0.5 ? 'p05' : v === 0 ? 'p0' : '', v === 1 ? '1' : v === 0.5 ? '½' : v === 0 ? '0' : '–');
+    b.title = 'Attendance: click to cycle – / 1 / ½ (late) / 0 (absent)';
+    b.onclick = () => { S.attendance[s.full] = v === undefined || v === '' ? 1 : v === 1 ? 0.5 : v === 0.5 ? 0 : ''; markDirty(); renderRoster(); };
+    ta.appendChild(b); tr.appendChild(ta); tbl.appendChild(tr);
+  }
+  const unknown = Object.keys(stats).filter(n => !roster.some(s => s.full === n));
+  for (const n of unknown) { const tr = el('tr'); tr.appendChild(el('td', null, n)).style.color = 'var(--warn)'; tr.appendChild(el('td', 'n has', stats[n].n)); tr.appendChild(el('td', 'n has', stats[n].p || '·')); tr.appendChild(el('td', 'att')); tbl.appendChild(tr); }
+  box.innerHTML = ''; box.appendChild(tbl);
+}
+function renderAll() { renderPending(); renderRows(); renderRoster(); renderTranscript(); }
+
+// ---------- sync ----------
+function setSyncState(kind) {
+  const e = $('#syncstate'); e.className = kind;
+  e.textContent = kind === 'ok' ? 'Synced ' + (S.lastSync ? fmtTime(S.lastSync) : '') : kind === 'dirty' ? 'Unsynced changes' : kind === 'bad' ? 'Sync failed' : kind === 'busy' ? 'Syncing…' : 'Not synced';
+}
+function payload() {
+  return {
+    action: 'sync', tab: S.tab, classDate: S.date, endNote: S.endNote, attendance: S.attendance,
+    rows: rowSorted().map(r => ({ id: r.id, t: new Date(r.t).toISOString(), timeText: r.timeText, student: r.student, type: r.type, note: r.note, points: r.points === '' ? '' : +r.points, transcript: snippetFor(r.t) }))
+  };
+}
+async function syncSheet(quiet) {
+  if (!settings.scriptUrl) { openSettings(); toast('Paste the Apps Script URL first.'); return; }
+  syncing = true; setSyncState('busy');
+  try {
+    // No custom headers → a "simple" request → no CORS preflight, which Apps Script can't answer.
+    const res = await fetch(settings.scriptUrl, { method: 'POST', body: JSON.stringify(payload()) });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'unknown error');
+    S.lastSync = Date.now(); dirty = false; saveSession(); setSyncState('ok');
+    if (!quiet) toast(`Synced: ${data.updated} updated, ${data.appended} added${data.warnings && data.warnings.length ? ' — ' + data.warnings.join('; ') : ''}`);
+  } catch (e) { setSyncState('bad'); toast('Sync failed: ' + e.message); console.error(e); }
+  syncing = false;
+}
+async function ping() {
+  const url = $('#s_url').value.trim(); $('#ping').textContent = 'Testing…';
+  try { const r = await fetch(url, { method: 'POST', body: JSON.stringify({ action: 'ping' }) }); const d = await r.json(); $('#ping').textContent = d.ok ? '✓ connected (' + (d.tabs || []).join(', ') + ')' : '✗ ' + d.error; }
+  catch (e) { $('#ping').textContent = '✗ ' + e.message; }
+}
+function downloadCSV() {
+  const esc = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+  const lines = [['Time', 'Student', 'Contribution Type', 'What they said', 'Points (1/2/3)', 'Transcript check / follow-up'].map(esc).join(',')];
+  for (const r of rowSorted()) lines.push([r.timeText || fmtTime(r.t), r.student, r.type, r.note, r.points, snippetFor(r.t)].map(esc).join(','));
+  const a = el('a'); a.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\n')], { type: 'text/csv' })); a.download = `participation-${S.date}.csv`; a.click();
+}
+
+// ---------- settings ----------
+function openSettings() {
+  $('#s_url').value = settings.scriptUrl; $('#s_auto').checked = settings.autoSync; $('#s_cool').value = settings.cooldownSec;
+  $('#s_roster').value = settings.rosterText; $('#s_common').value = settings.commonWords; $('#ping').textContent = '';
+  $('#modal').classList.add('open');
+}
+function saveSettingsFromModal() {
+  settings.scriptUrl = $('#s_url').value.trim(); settings.autoSync = $('#s_auto').checked; settings.cooldownSec = Math.max(5, +$('#s_cool').value || 45);
+  settings.rosterText = $('#s_roster').value; settings.commonWords = $('#s_common').value; roster = parseRoster(settings.rosterText);
+  saveSettings(); $('#modal').classList.remove('open'); renderAll(); toast('Settings saved');
+  if (roster.length) $('#banner').classList.remove('show');
+}
+
+// ---------- misc ui ----------
+let toastTimer;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 3500); }
+
+document.addEventListener('keydown', e => {
+  const tag = e.target.tagName, inInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); newRow(); return; }
+  if ($('#modal').classList.contains('open')) { if (e.key === 'Escape') $('#modal').classList.remove('open'); return; }
+  if (inInput) { if (e.key === 'Escape') e.target.blur(); return; }
+  if (e.key === 'n' || e.key === 'N') { e.preventDefault(); newRow(); }
+  else if (e.key === 'Enter' && pending.length && pending[0].candidates.length === 1) { e.preventDefault(); acceptPending(pending[0], 0); }
+  else if (e.key === 'Escape' && pending.length) { dismissPending(pending[0]); }
+  else if (/^[1-9]$/.test(e.key) && pending.length && pending[0].candidates.length > 1) { acceptPending(pending[0], +e.key - 1); }
+});
+$('#recbtn').onclick = () => listening ? stopListening() : startListening();
+$('#newbtn').onclick = newRow;
+$('#syncbtn').onclick = () => syncSheet(false);
+$('#csvbtn').onclick = downloadCSV;
+$('#setbtn').onclick = openSettings;
+$('#s_cancel').onclick = () => $('#modal').classList.remove('open');
+$('#s_save').onclick = saveSettingsFromModal;
+$('#pingbtn').onclick = ping;
+$('#s_import').onclick = async () => {
+  const url = $('#s_url').value.trim(); if (!url) { $('#s_importmsg').textContent = 'paste the sync URL first'; return; }
+  $('#s_importmsg').textContent = 'Loading…';
+  try { const r = await fetch(url, { method: 'POST', body: JSON.stringify({ action: 'roster' }) }); const d = await r.json(); if (!d.ok) throw new Error(d.error);
+    const existing = parseRoster($('#s_roster').value); const merged = d.names.map(n => { const e = existing.find(x => x.full === n); return e && e.nicks.length ? n + ' | ' + e.nicks.join(', ') : n; });
+    $('#s_roster').value = merged.join('\n'); $('#s_importmsg').textContent = '✓ ' + d.names.length + ' names from tab "' + d.tab + '" — click Save'; }
+  catch (e) { $('#s_importmsg').textContent = '✗ ' + e.message; }
+};
+$('#s_wipe').onclick = () => { if (confirm('Clear all rows, transcript, note and attendance for ' + S.date + '? This cannot be undone.')) { localStorage.removeItem('lta:session:' + S.date); loadSession(S.date); $('#modal').classList.remove('open'); } };
+$('#date').onchange = () => { if (listening) stopListening(); loadSession($('#date').value || todayISO()); };
+$('#tab').onchange = () => { S.tab = $('#tab').value.trim() || tabFor(S.date); $('#tab').value = S.tab; markDirty(); };
+$('#endnote').oninput = () => { S.endNote = $('#endnote').value; markDirty(); };
+window.addEventListener('beforeunload', e => { if (listening || dirty) { e.preventDefault(); e.returnValue = ''; } });
+
+if (!SR) { $('#banner').textContent = 'Live transcription needs Google Chrome (or Edge). Everything else works, but no name cards.'; $('#banner').classList.add('show'); }
+loadSession(todayISO());
+if (!roster.length) { $('#banner').textContent = 'No roster yet — open Settings, paste the sync URL, then "Import roster from sheet" (or paste names).'; $('#banner').classList.add('show'); }
+</script>
+</body>
+</html>
