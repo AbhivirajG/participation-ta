@@ -5,7 +5,7 @@
  * deploy as a Web app (Execute as: Me, Who has access: Anyone). The web app
  * POSTs JSON here; nothing else calls it.
  *
- * Sheet layout it expects (the existing per-class tabs, e.g. "914", "916"):
+ * Sheet layout it expects (the existing per-class tabs, e.g. "9/14", "9/16"):
  *   A6:F  Time | Student | Type | What they said | Points | Transcript check
  *   G5    "App ID" — written by this script; hidden-ish column that lets a row
  *         be updated in place when the TA edits it in the app.
@@ -123,7 +123,7 @@ function roster_(tab) {
   var ss = SpreadsheetApp.getActive();
   var sh = tab ? ss.getSheetByName(tab) : null;
   if (!sh) {
-    var numeric = ss.getSheets().filter(function (s) { return /^\d+$/.test(s.getName()); });
+    var numeric = ss.getSheets().filter(function (s) { return /^\d+\/\d+$/.test(s.getName()); });
     sh = numeric.length ? numeric[numeric.length - 1] : null;
   }
   if (!sh) throw new Error('no class tab found');
@@ -132,10 +132,10 @@ function roster_(tab) {
   return { ok: true, tab: sh.getName(), names: names };
 }
 
-/** New class tab = copy of the most recent numeric tab (e.g. "916"), with the log cleared. */
+/** New class tab = copy of the most recent date-named tab (e.g. "9/16"), with the log cleared. */
 function createClassTab_(ss, name) {
   var sheets = ss.getSheets();
-  var numeric = sheets.filter(function (s) { return /^\d+$/.test(s.getName()); });
+  var numeric = sheets.filter(function (s) { return /^\d+\/\d+$/.test(s.getName()); });
   var tpl = numeric.length ? numeric[numeric.length - 1] : sheets[sheets.length - 1];
   var sh = tpl.copyTo(ss).setName(name);
   ss.setActiveSheet(sh); ss.moveActiveSheet(ss.getNumSheets());

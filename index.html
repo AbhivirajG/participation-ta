@@ -23,7 +23,7 @@
   #top h1 { font-size: 15px; margin: 0 8px 0 0; letter-spacing: .2px; }
   #top label { color: var(--muted); font-size: 12px; display: flex; align-items: center; gap: 6px; }
   #top input[type=date], #top input[type=text] { border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; background: #fff; }
-  #tab { width: 64px; font-family: var(--mono); }
+  #tab { width: 72px; font-family: var(--mono); }
   .spacer { flex: 1; }
   .btn { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 6px 12px; }
   .btn:hover { background: #f1f3f6; }
@@ -238,7 +238,7 @@ const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) 
 const uid = () => Math.random().toString(36).slice(2, 10);
 const fmtTime = ms => new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
-const tabFor = iso => { const [, m, d] = iso.split('-'); return `${+m}${+d}`; };   // 2026-09-16 -> "916"
+const tabFor = iso => { const [, m, d] = iso.split('-'); return `${+m}/${+d}`; };   // 2026-09-16 -> "9/16" (matches the sheet's tab names)
 
 function loadJSON(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }
 function saveJSON(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { console.warn('storage', e); } }

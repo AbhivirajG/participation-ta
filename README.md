@@ -40,7 +40,7 @@ Files:
 
 Everything is saved in the browser as you go, per class date. Closing the tab
 by accident loses nothing. The **Tab** box is the sheet tab to write into
-(defaults to the date, `916` for Sept 16). If that tab doesn't exist yet the
+(defaults to the date, `9/16` for Sept 16). If that tab doesn't exist yet the
 script creates it as a copy of the latest one.
 
 ---
